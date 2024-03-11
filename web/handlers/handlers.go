@@ -16,7 +16,7 @@ func GetMainPage(c *gin.Context) {
 }
 
 func GetObject(c *gin.Context) {
-	be := database.Get()
+	be := database.GetByName("SCP-4065")
 
 	c.HTML(200, "object.html", gin.H{"name": be.Name})
 }
