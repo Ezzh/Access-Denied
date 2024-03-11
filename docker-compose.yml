@@ -1,0 +1,19 @@
+version: '3'
+
+services:
+    mongo:
+        image: mongo
+        container_name: mongodb
+        volumes:
+        - ./mongodb_data:/data/db 
+    web:
+        build: ./web/
+        volumes:
+            - ./web/resources:/usr/src/app/resources
+            - ./web/templates:/usr/src/app/templates
+        ports:
+        - "8000:8000"
+    mongo-express:
+        image: mongo-express
+        ports:
+        - "8081:8081"
