@@ -11,9 +11,6 @@ services:
         volumes:
             - ./web/resources:/usr/src/app/resources
             - ./web/templates:/usr/src/app/templates
+            - ./web/secret-data:/usr/src/app/secret-data
         ports:
         - "8000:8000"
-    mongo-express:
-        image: mongo-express
-        ports:
-        - "8081:8081"

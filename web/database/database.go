@@ -13,6 +13,7 @@ type SCP struct {
 	Name            string
 	DescryptionPath string
 	ImagePath       string
+	IsSecret        bool
 }
 
 var (
@@ -34,10 +35,6 @@ func InitDataBase() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	if err != nil {
-		log.Fatal(err)
-	}
-
 }
 
 func GetCollection(collectionName string) *mongo.Collection {
@@ -54,14 +51,15 @@ func GetByName(name string) SCP {
 
 	err = collection.FindOne(ctx, bson.M{"name": name}).Decode(&result)
 	if err != nil {
-		log.Fatal(err)
+		log.Default()
+		return SCP{}
 	}
 
 	return result
 }
 
 func GetAll() []SCP {
-	var result []SCP
+	var results []SCP
 	var err error
 	collection := GetCollection("SCPs")
 	if err != nil {
@@ -74,12 +72,13 @@ func GetAll() []SCP {
 	}
 
 	for cur.Next(ctx) {
-		var result bson.D
-		err := cur.Decode(&result)
+		var elem SCP
+		err := cur.Decode(&elem)
 		if err != nil {
 			log.Fatal(err)
 		}
+		results = append(results, elem)
 	}
 
-	return result
+	return results
 }

@@ -1,13 +1,12 @@
 {{ template "head" . }}
 <body>
     {{ template "header" . }}
-    {{ template "banner" . }}
     <div id="content">
-        <h2>Список объектов SCP:</h2>
+        <h2>Список объектов SCP</h2>
         <ul>
-            <li><a href="#">SCP-001</a></li>
-            <li><a href="#">SCP-002</a></li>
-            <li><a href="#">SCP-003</a></li>
+            {{ range .objects }}
+            <li><a href="/{{ .Name }}">{{ .Name }}</a></li>
+            {{ end }}
             <!-- Добавьте ссылки на другие объекты SCP -->
         </ul>
     </div>

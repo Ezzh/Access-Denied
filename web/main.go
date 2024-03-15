@@ -14,5 +14,6 @@ func main() {
 	router.Static("/resources", "./resources")
 	router.GET("/", handlers.GetMainPage)
 	router.GET("/:object", handlers.GetObject)
+	router.GET("/validate", handlers.Validate)
 	router.Run(":8000")
 }
