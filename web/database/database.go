@@ -3,18 +3,12 @@ package database
 import (
 	"context"
 	"log"
+	"web/models"
 
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"
 	"go.mongodb.org/mongo-driver/mongo/options"
 )
-
-type SCP struct {
-	Name            string
-	DescryptionPath string
-	ImagePath       string
-	IsSecret        bool
-}
 
 var (
 	client *mongo.Client
@@ -41,8 +35,8 @@ func GetCollection(collectionName string) *mongo.Collection {
 	return db.Collection(collectionName)
 }
 
-func GetByName(name string) SCP {
-	var result SCP
+func GetByName(name string) models.SCP {
+	var result models.SCP
 	var err error
 	collection := GetCollection("SCPs")
 	if err != nil {
@@ -52,14 +46,14 @@ func GetByName(name string) SCP {
 	err = collection.FindOne(ctx, bson.M{"name": name}).Decode(&result)
 	if err != nil {
 		log.Default()
-		return SCP{}
+		return models.SCP{}
 	}
 
 	return result
 }
 
-func GetAll() []SCP {
-	var results []SCP
+func GetAll() []models.SCP {
+	var results []models.SCP
 	var err error
 	collection := GetCollection("SCPs")
 	if err != nil {
@@ -72,7 +66,7 @@ func GetAll() []SCP {
 	}
 
 	for cur.Next(ctx) {
-		var elem SCP
+		var elem models.SCP
 		err := cur.Decode(&elem)
 		if err != nil {
 			log.Fatal(err)
@@ -81,4 +75,20 @@ func GetAll() []SCP {
 	}
 
 	return results
+}
+
+func CreateUser(user models.User) {
+	collection := GetCollection("users")
+	_, err := collection.InsertOne(ctx, user)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func CreateSCP(SCP models.SCP) {
+	collection := GetCollection("SCPs")
+	_, err := collection.InsertOne(ctx, SCP)
+	if err != nil {
+		log.Fatal(err)
+	}
 }

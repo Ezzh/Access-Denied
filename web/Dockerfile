@@ -7,6 +7,7 @@ RUN go mod download && go mod verify
 EXPOSE 8080
 
 COPY ./handlers ./handlers/
+COPY ./models ./models/
 COPY ./database ./database/
 COPY ./main.go .
 COPY ./templates ./templates/

@@ -4,9 +4,9 @@ services:
     mongo:
         image: mongo
         container_name: mongodb
-        volumes:
-        - ./mongodb_data:/data/db 
     web:
+        depends_on:
+            - mongo
         build: ./web/
         volumes:
             - ./web/resources:/usr/src/app/resources
