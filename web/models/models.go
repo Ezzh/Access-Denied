@@ -4,6 +4,7 @@ type SCP struct {
 	Name            string
 	DescryptionPath string
 	ImagePath       string
+	Author          string
 	IsSecret        bool
 }
 

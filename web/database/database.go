@@ -85,6 +85,25 @@ func CreateUser(user models.User) {
 	}
 }
 
+func GetAllUser() []models.User {
+	var results []models.User
+	collection := GetCollection("users")
+	cur, err := collection.Find(ctx, bson.D{})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for cur.Next(ctx) {
+		var elem models.User
+		err := cur.Decode(&elem)
+		if err != nil {
+			log.Fatal(err)
+		}
+		results = append(results, elem)
+	}
+	return results
+}
+
 func CreateSCP(SCP models.SCP) {
 	collection := GetCollection("SCPs")
 	_, err := collection.InsertOne(ctx, SCP)

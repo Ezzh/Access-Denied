@@ -8,6 +8,7 @@ EXPOSE 8080
 
 COPY ./handlers ./handlers/
 COPY ./models ./models/
+COPY ./logic ./logic/
 COPY ./database ./database/
 COPY ./main.go .
 COPY ./templates ./templates/

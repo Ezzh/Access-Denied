@@ -2,7 +2,6 @@ package handlers
 
 import (
 	"encoding/base64"
-	"encoding/json"
 	"io"
 	"log"
 	"net/http"
@@ -12,6 +11,7 @@ import (
 	"web/database"
 	"web/models"
 
+	"github.com/gin-contrib/sessions"
 	"github.com/gin-gonic/gin"
 )
 
@@ -23,35 +23,51 @@ func Validate(c *gin.Context) {
 	c.JSON(200, data)
 }
 
-func access_verification(c *gin.Context, object models.SCP) bool {
-	result := map[string]interface{}{"access": false}
-	response, err := http.Get("http://" + c.Request.Host + "/validate")
-	if err != nil {
-		return false
-	}
-	defer response.Body.Close()
-	json.NewDecoder(response.Body).Decode(&result)
-	if access, ok := result["access"].(bool); ok {
-		return access
-	} else {
-		return false
-	}
-}
-
-func Register(c *gin.Context) {
+func PostRegister(c *gin.Context) {
 	var user models.User
-	if err := c.BindJSON(&user); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
-		return
+	user.Username = c.PostForm("username")
+	user.Password = c.PostForm("password")
+	session := sessions.Default(c)
+
+	for _, u := range database.GetAllUser() {
+		if u.Username == user.Username {
+			c.HTML(http.StatusOK, "register.html", gin.H{"error": "Такой пользователь уже существует!"})
+			return
+		}
+	}
+	database.CreateUser(user)
+	session.Set("username", user.Username)
+	session.Save()
+	c.Redirect(http.StatusFound, "/")
+}
+
+func GetRegister(c *gin.Context) {
+	c.HTML(200, "register.html", gin.H{})
+}
+
+func PostLogin(c *gin.Context) {
+	var user models.User
+	user.Username = c.PostForm("username")
+	user.Password = c.PostForm("password")
+	session := sessions.Default(c)
+
+	for _, u := range database.GetAllUser() {
+		if u.Username == user.Username && u.Password == user.Password {
+			session.Set("username", user.Username)
+			session.Save()
+			c.Redirect(http.StatusFound, "/")
+			return
+		}
 	}
 
-	// for _, u := range users {
-	// 	if u.Username == user.Username {
-	// 		c.JSON(http.StatusBadRequest, gin.H{"error": "Пользователь с таким именем уже существует"})
-	// 		return
-	// 	}
-	// }
+	c.HTML(http.StatusOK, "login.html", gin.H{"error": "Неправильное имя пользователя или пароль"})
+
 }
+
+func GetLogin(c *gin.Context) {
+	c.HTML(200, "login.html", gin.H{})
+}
+
 func GetMainPage(c *gin.Context) {
 	objects := database.GetAll()
 	c.HTML(200, "main_page.html", gin.H{"objects": objects})
@@ -59,12 +75,12 @@ func GetMainPage(c *gin.Context) {
 
 func GetObject(c *gin.Context) {
 	object := database.GetByName(c.Param("object"))
-	if object.IsSecret {
-		if !access_verification(c, object) {
-			c.String(200, "Access denied!!!")
-			return
-		}
-	}
+	// if object.IsSecret {
+	// 	if !access_verification(c, object) {
+	// 		c.String(200, "Access denied!!!")
+	// 		return
+	// 	}
+	// }
 	if object == (models.SCP{}) {
 		c.String(http.StatusNotFound, "Object not found")
 		return
@@ -128,6 +144,8 @@ func PostCreateSCP(c *gin.Context) {
 		c.String(500, "Ошибка при записи в файл")
 		return
 	}
+
+	database.CreateSCP(models.SCP{DescryptionPath: name + ".txt", ImagePath: image.Filename, Name: name, IsSecret: false})
 
 	c.String(200, "Данные успешно сохранены")
 }
