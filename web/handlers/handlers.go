@@ -9,6 +9,7 @@ import (
 	"path/filepath"
 	"strings"
 	"web/database"
+	"web/logic"
 	"web/models"
 
 	"github.com/gin-contrib/sessions"
@@ -28,7 +29,12 @@ func PostRegister(c *gin.Context) {
 	user.Username = c.PostForm("username")
 	user.Password = c.PostForm("password")
 	session := sessions.Default(c)
-
+	if user.Username == "" {
+		c.HTML(http.StatusOK, "register.html", gin.H{"error": "Введите имя!"})
+	}
+	if user.Password == "" {
+		c.HTML(http.StatusOK, "register.html", gin.H{"error": "Введите пароль!"})
+	}
 	for _, u := range database.GetAllUser() {
 		if u.Username == user.Username {
 			c.HTML(http.StatusOK, "register.html", gin.H{"error": "Такой пользователь уже существует!"})
@@ -69,12 +75,18 @@ func GetLogin(c *gin.Context) {
 }
 
 func GetMainPage(c *gin.Context) {
-	objects := database.GetAll()
-	c.HTML(200, "main_page.html", gin.H{"objects": objects})
+	user := logic.GetUserFromSession(c)
+	objects := database.GetSCPbyDepartment(user.Department)
+	c.HTML(200, "main_page.html", gin.H{"user": user, "objects": objects})
 }
 
 func GetObject(c *gin.Context) {
-	object := database.GetByName(c.Param("object"))
+	user := logic.GetUserFromSession(c)
+	object := database.GetSCPByName(c.Param("object"))
+	if user.Department != object.Department {
+		c.String(http.StatusUnauthorized, "Этот объект принадлежит другому отделу!")
+		return
+	}
 	// if object.IsSecret {
 	// 	if !access_verification(c, object) {
 	// 		c.String(200, "Access denied!!!")
@@ -100,13 +112,26 @@ func GetObject(c *gin.Context) {
 	}
 	log.Print(string(description))
 	encodedImage := base64.StdEncoding.EncodeToString(imageData)
-	c.HTML(200, "object.html", gin.H{"name": object.Name, "imagedata": encodedImage, "description": strings.Split(string(description), "\n")})
+	c.HTML(200, "object.html", gin.H{"name": object.Name, "imagedata": encodedImage, "description": strings.Split(string(description), "\n"), "user": user})
 }
 
 func PostCreateSCP(c *gin.Context) {
+	user := logic.GetUserFromSession(c)
+	if user.Department == "" {
+		c.HTML(http.StatusOK, "create_scp.html", gin.H{"user": user, "error": "Чтобы создавать документы, нужно быть в отделе!"})
+		return
+	}
+
 	name := c.PostForm("name")
 	description := c.PostForm("description")
 	image, err := c.FormFile("image")
+
+	for _, s := range database.GetAll() {
+		if s.Name == name {
+			c.HTML(http.StatusOK, "create_scp.html", gin.H{"user": user, "error": "Такой объект уже существует!"})
+			return
+		}
+	}
 
 	if err != nil {
 		c.String(400, "Ошибка при загрузке файла")
@@ -145,11 +170,66 @@ func PostCreateSCP(c *gin.Context) {
 		return
 	}
 
-	database.CreateSCP(models.SCP{DescryptionPath: name + ".txt", ImagePath: image.Filename, Name: name, IsSecret: false})
+	database.CreateSCP(models.SCP{DescryptionPath: name + ".txt", ImagePath: image.Filename, Name: name, Department: user.Department})
 
-	c.String(200, "Данные успешно сохранены")
+	c.Redirect(302, "/")
 }
 
 func GetCreateSCP(c *gin.Context) {
-	c.HTML(200, "create_scp.html", gin.H{})
+	user := logic.GetUserFromSession(c)
+	c.HTML(200, "create_scp.html", gin.H{"user": user})
+}
+
+func Department(c *gin.Context) {
+	user := logic.GetUserFromSession(c)
+	c.HTML(200, "department.html", gin.H{"user": user, "users": database.GetDepartmentStaff(user.Department)})
+}
+
+func GetCreateDepartment(c *gin.Context) {
+	user := logic.GetUserFromSession(c)
+	c.HTML(200, "create_department.html", gin.H{"user": user})
+}
+
+func PostCreateDepartment(c *gin.Context) {
+	user := logic.GetUserFromSession(c)
+	name_department := c.PostForm("name_department")
+	for _, u := range database.GetAllUser() {
+		if u.Department == name_department {
+			c.HTML(http.StatusOK, "create_department.html", gin.H{"user": user, "error": "Такой отдел уже существует!"})
+			return
+		}
+	}
+	database.ChangeDepartment(user, name_department)
+	c.Redirect(http.StatusFound, "/")
+}
+
+func Invite(c *gin.Context) {
+	user := logic.GetUserFromSession(c)
+	username := c.PostForm("username")
+	if user.Department == "" {
+		c.HTML(http.StatusOK, "department.html", gin.H{"users": database.GetDepartmentStaff(user.Department), "user": user, "error": "Вы не состоите в отделе!"})
+		return
+	}
+	guest := database.GetUserByName(username)
+	if guest.Username == "" {
+		c.HTML(http.StatusOK, "department.html", gin.H{"users": database.GetDepartmentStaff(user.Department), "user": user, "error": "Пользователь с таким именем не найден!"})
+		return
+	}
+	if guest.Department != "" {
+		c.HTML(http.StatusOK, "department.html", gin.H{"users": database.GetDepartmentStaff(user.Department), "user": user, "error": "Пользователь уже состоит в отделе!"})
+		return
+	}
+	database.ChangeDepartment(guest, user.Department)
+	c.Redirect(http.StatusFound, "/department")
+}
+
+func Logout(c *gin.Context) {
+	logic.ExitSession(c)
+	c.Redirect(http.StatusFound, "/login")
+}
+
+func ExitFromDepartment(c *gin.Context) {
+	user := logic.GetUserFromSession(c)
+	database.ChangeDepartment(user, "")
+	c.Redirect(http.StatusFound, "/")
 }

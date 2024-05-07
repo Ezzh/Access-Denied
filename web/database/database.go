@@ -35,7 +35,7 @@ func GetCollection(collectionName string) *mongo.Collection {
 	return db.Collection(collectionName)
 }
 
-func GetByName(name string) models.SCP {
+func GetSCPByName(name string) models.SCP {
 	var result models.SCP
 	var err error
 	collection := GetCollection("SCPs")
@@ -77,12 +77,54 @@ func GetAll() []models.SCP {
 	return results
 }
 
+func GetSCPbyDepartment(department string) []models.SCP {
+	var results []models.SCP
+	var err error
+	collection := GetCollection("SCPs")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	cur, err := collection.Find(ctx, bson.M{"department": department})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for cur.Next(ctx) {
+		var elem models.SCP
+		err := cur.Decode(&elem)
+		if err != nil {
+			log.Fatal(err)
+		}
+		results = append(results, elem)
+	}
+
+	return results
+}
+
 func CreateUser(user models.User) {
 	collection := GetCollection("users")
 	_, err := collection.InsertOne(ctx, user)
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func GetUserByName(name string) models.User {
+	var result models.User
+	var err error
+	collection := GetCollection("users")
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	err = collection.FindOne(ctx, bson.M{"username": name}).Decode(&result)
+	if err != nil {
+		log.Default()
+		return models.User{}
+	}
+
+	return result
 }
 
 func GetAllUser() []models.User {
@@ -110,4 +152,35 @@ func CreateSCP(SCP models.SCP) {
 	if err != nil {
 		log.Fatal(err)
 	}
+}
+
+func ChangeDepartment(user models.User, department string) {
+	collection := GetCollection("users")
+	user.Department = department
+	_, err := collection.ReplaceOne(ctx, bson.M{"username": user.Username}, user)
+	if err != nil {
+		log.Fatal(err)
+	}
+}
+
+func GetDepartmentStaff(department string) []models.User {
+	var results []models.User
+	collection := GetCollection("users")
+
+	cur, err := collection.Find(ctx, bson.M{"department": department})
+	if err != nil {
+		log.Fatal(err)
+	}
+
+	for cur.Next(ctx) {
+		var elem models.User
+		err := cur.Decode(&elem)
+		if err != nil {
+			log.Fatal(err)
+		}
+		results = append(results, elem)
+	}
+
+	return results
+
 }

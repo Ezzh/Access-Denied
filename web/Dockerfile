@@ -12,7 +12,6 @@ COPY ./logic ./logic/
 COPY ./database ./database/
 COPY ./main.go .
 COPY ./templates ./templates/
-RUN ls
 RUN go build -o /usr/local/bin/app
 
 CMD ["app"]

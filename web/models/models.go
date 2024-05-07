@@ -4,11 +4,11 @@ type SCP struct {
 	Name            string
 	DescryptionPath string
 	ImagePath       string
-	Author          string
-	IsSecret        bool
+	Department      string
 }
 
 type User struct {
-	Username string
-	Password string
+	Username   string
+	Password   string
+	Department string
 }

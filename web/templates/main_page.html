@@ -2,13 +2,21 @@
 <body>
     {{ template "header" . }}
     <div id="content">
-        <h2>Список объектов SCP</h2>
-        <ul>
-            {{ range .objects }}
-            <li><a href="/{{ .Name }}">{{ .Name }}</a></li>
+        {{ if .user.Department }}
+            {{ if .objects }}
+            <h2>Список объектов SCP</h2>
+            <ul>
+                {{ range .objects }}
+                <li><a href="/{{ .Name }}">{{ .Name }}</a></li>
+                {{ end }}
+                <!-- Добавьте ссылки на другие объекты SCP -->
+            </ul>
+            {{ else }}
+            <h2>Объектов нет!</h2>
             {{ end }}
-            <!-- Добавьте ссылки на другие объекты SCP -->
-        </ul>
+        {{ else }}
+        <h2>Вы не состоите в отделе!</h2>
+        {{ end }}
     </div>
 </body>
 </html>
