@@ -16,12 +16,23 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func Validate(c *gin.Context) {
-	// host := c.Request.Host
-	data := map[string]interface{}{
-		"access": false,
+func validate(c *gin.Context, department string) bool {
+
+	cookie, err := c.Cookie("department")
+	if err != nil {
+		if err == http.ErrNoCookie {
+			return false
+		}
+		return false
 	}
-	c.JSON(200, data)
+	dep, err := logic.GetAndVerificate(cookie)
+	if err != nil {
+		return false
+	}
+	if dep != department {
+		return false
+	}
+	return true
 }
 
 func PostRegister(c *gin.Context) {
@@ -61,6 +72,10 @@ func PostLogin(c *gin.Context) {
 		if u.Username == user.Username && u.Password == user.Password {
 			session.Set("username", user.Username)
 			session.Save()
+			user := logic.GetUserFromSession(c)
+			if user.Department != "" {
+				c.SetCookie("department", logic.GetDepartmentCookie(user.Department), 3600, "/", "", false, true)
+			}
 			c.Redirect(http.StatusFound, "/")
 			return
 		}
@@ -76,32 +91,33 @@ func GetLogin(c *gin.Context) {
 
 func GetMainPage(c *gin.Context) {
 	user := logic.GetUserFromSession(c)
-	objects := database.GetSCPbyDepartment(user.Department)
+	if user.Department != "" {
+		c.SetCookie("department", logic.GetDepartmentCookie(user.Department), 3600, "/", "", false, true)
+	}
+	cookie, _ := c.Cookie("department")
+	dep, _ := logic.GetAndVerificate(cookie)
+	objects := database.GetSCPbyDepartment(dep)
 	c.HTML(200, "main_page.html", gin.H{"user": user, "objects": objects})
 }
 
 func GetObject(c *gin.Context) {
 	user := logic.GetUserFromSession(c)
 	object := database.GetSCPByName(c.Param("object"))
-	if user.Department != object.Department {
-		c.String(http.StatusUnauthorized, "Этот объект принадлежит другому отделу!")
+	if !validate(c, object.Department) {
+		c.String(200, "Access denied!!!")
 		return
 	}
-	// if object.IsSecret {
-	// 	if !access_verification(c, object) {
-	// 		c.String(200, "Access denied!!!")
-	// 		return
-	// 	}
-	// }
 	if object == (models.SCP{}) {
 		c.String(http.StatusNotFound, "Object not found")
 		return
 	}
 	imageData, err := os.ReadFile("./secret-data/images/" + object.ImagePath)
 	if err != nil {
-		log.Print(err.Error())
-		c.String(http.StatusInternalServerError, "Error reading image")
-		return
+		imageData, err = os.ReadFile("./resources/images/404.png")
+		if err != nil {
+			c.String(500, "Error reading image")
+			return
+		}
 	}
 
 	description, err := os.ReadFile("./secret-data/description/" + object.DescryptionPath)
@@ -110,7 +126,6 @@ func GetObject(c *gin.Context) {
 		c.String(http.StatusInternalServerError, "Error reading descrptoin")
 		return
 	}
-	log.Print(string(description))
 	encodedImage := base64.StdEncoding.EncodeToString(imageData)
 	c.HTML(200, "object.html", gin.H{"name": object.Name, "imagedata": encodedImage, "description": strings.Split(string(description), "\n"), "user": user})
 }
@@ -124,8 +139,20 @@ func PostCreateSCP(c *gin.Context) {
 
 	name := c.PostForm("name")
 	description := c.PostForm("description")
-	image, err := c.FormFile("image")
+	_, header, _ := c.Request.FormFile("image")
+	image_name := ""
 
+	if header != nil {
+		maxSize := int64(1024 * 1024 * 10)
+
+		fileSize := header.Size
+		if fileSize > maxSize {
+			c.String(http.StatusBadRequest, "Превышен максимальный размер файла (10MB)")
+			return
+		}
+	}
+
+	image, err := c.FormFile("image")
 	for _, s := range database.GetAll() {
 		if s.Name == name {
 			c.HTML(http.StatusOK, "create_scp.html", gin.H{"user": user, "error": "Такой объект уже существует!"})
@@ -133,31 +160,29 @@ func PostCreateSCP(c *gin.Context) {
 		}
 	}
 
-	if err != nil {
-		c.String(400, "Ошибка при загрузке файла")
-		return
-	}
-	ImageFilePath := filepath.Join("./secret-data/images", filepath.Base(image.Filename))
-	file, err := os.Create(ImageFilePath)
-	if err != nil {
-		c.String(500, "Ошибка при создании файла для изображения")
-		return
-	}
-	defer file.Close()
+	if err == nil {
+		ImageFilePath := filepath.Join("./secret-data/images", image.Filename)
+		file, err := os.Create(ImageFilePath)
+		if err != nil {
+			c.String(500, "Ошибка при создании файла для изображения")
+			return
+		}
+		defer file.Close()
+		src, err := image.Open()
+		if err != nil {
+			c.String(500, "Ошибка при открытии файла: %v", err)
+			return
+		}
+		defer src.Close()
 
-	src, err := image.Open()
-	if err != nil {
-		c.String(500, "Ошибка при открытии файла: %v", err)
-		return
-	}
-	defer src.Close()
-
-	if _, err := io.Copy(file, src); err != nil {
-		c.String(500, "Ошибка при сохранении изображения")
-		return
+		if _, err := io.Copy(file, src); err != nil {
+			c.String(500, "Ошибка при сохранении изображения")
+			return
+		}
+		image_name = image.Filename
 	}
 
-	txtFilePath := filepath.Join("./secret-data/description", filepath.Base(name)+".txt")
+	txtFilePath := filepath.Join("./secret-data/description", filepath.Base(name))
 	txtFile, err := os.OpenFile(txtFilePath, os.O_APPEND|os.O_CREATE|os.O_WRONLY, 0644)
 	if err != nil {
 		c.String(500, "Ошибка при открытии файла")
@@ -170,7 +195,7 @@ func PostCreateSCP(c *gin.Context) {
 		return
 	}
 
-	database.CreateSCP(models.SCP{DescryptionPath: name + ".txt", ImagePath: image.Filename, Name: name, Department: user.Department})
+	database.CreateSCP(models.SCP{DescryptionPath: name, ImagePath: image_name, Name: name, Department: user.Department})
 
 	c.Redirect(302, "/")
 }
@@ -182,6 +207,9 @@ func GetCreateSCP(c *gin.Context) {
 
 func Department(c *gin.Context) {
 	user := logic.GetUserFromSession(c)
+	if user.Department != "" {
+		c.SetCookie("department", logic.GetDepartmentCookie(user.Department), 3600, "/", "", false, true)
+	}
 	c.HTML(200, "department.html", gin.H{"user": user, "users": database.GetDepartmentStaff(user.Department)})
 }
 
@@ -216,7 +244,7 @@ func Invite(c *gin.Context) {
 		return
 	}
 	if guest.Department != "" {
-		c.HTML(http.StatusOK, "department.html", gin.H{"users": database.GetDepartmentStaff(user.Department), "user": user, "error": "Пользователь уже состоит в отделе!"})
+		c.HTML(http.StatusOK, "department.html", gin.H{"users": database.GetDepartmentStaff(user.Department), "user": user, "error": "Пользователь уже состоит в отделе ", "guest": guest})
 		return
 	}
 	database.ChangeDepartment(guest, user.Department)
@@ -225,11 +253,13 @@ func Invite(c *gin.Context) {
 
 func Logout(c *gin.Context) {
 	logic.ExitSession(c)
+	c.SetCookie("department", "", -1, "/", "", false, true)
 	c.Redirect(http.StatusFound, "/login")
 }
 
 func ExitFromDepartment(c *gin.Context) {
 	user := logic.GetUserFromSession(c)
 	database.ChangeDepartment(user, "")
+	c.SetCookie("department", "", -1, "/", "", false, true)
 	c.Redirect(http.StatusFound, "/")
 }

@@ -29,7 +29,7 @@
                     </div>
                     <button type="submit" class="btn btn-primary btn-login btn-block">Пригласить</button>
                     {{ if .error }}
-                    <p style="color: red;padding-left: 10px;padding-top: 20px;">{{ .error }}</p>
+                    <p style="color: red;padding-left: 10px;padding-top: 20px;">{{ .error }} {{ .guest.Department }}</p>
                     {{ end }}
                 </form>
             </div>
@@ -54,4 +54,3 @@
     
     </body>
     </html>
-    

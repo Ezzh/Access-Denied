@@ -4,14 +4,10 @@ WORKDIR /usr/src/app
 
 COPY go.mod go.sum* ./
 RUN go mod download && go mod verify
-EXPOSE 8080
+EXPOSE 8000
 
-COPY ./handlers ./handlers/
-COPY ./models ./models/
-COPY ./logic ./logic/
-COPY ./database ./database/
-COPY ./main.go .
-COPY ./templates ./templates/
+ENV secret=bebebe
+COPY ./ ./
 RUN go build -o /usr/local/bin/app
 
 CMD ["app"]

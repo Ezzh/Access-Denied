@@ -4,17 +4,15 @@ services:
     mongo:
         image: mongo
         container_name: mongodb
+        healthcheck:
+            test: ["CMD", "mongosh", "--norc", "--quiet", "--host=localhost:27017", "--eval", "'db.getMongo()'"]
+            interval: 5s
+            timeout: 5s
+            retries: 3
     web:
         depends_on:
-            - mongo
+            mongo:
+                condition: service_healthy
         build: ./web/
-        volumes:
-            - ./web/resources:/usr/src/app/resources
-            - ./web/templates:/usr/src/app/templates
-            - ./web/secret-data:/usr/src/app/secret-data
         ports:
-        - "8000:8000"
-    mongo-express:
-        image: mongo-express
-        ports:
-        - "8081:8081"
+        - "2324:8000"

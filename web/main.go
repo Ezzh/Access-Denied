@@ -11,12 +11,15 @@ import (
 )
 
 func main() {
-	store := cookie.NewStore([]byte("secret"))
+	secret := logic.GenerateRandomKey()
+	store := cookie.NewStore([]byte(secret))
 	database.InitDataBase()
 	router := gin.Default()
 	router.Use(sessions.Sessions("mysession", store))
 	router.LoadHTMLGlob("./templates/*.html")
 	router.Static("/resources", "./resources")
+	router.Use(gin.Recovery())
+	router.Use(gin.Logger())
 	router.GET("/", logic.AuthRequired, handlers.GetMainPage)
 	router.GET("/:object", logic.AuthRequired, handlers.GetObject)
 	// router.GET("/validate", handlers.Validate)

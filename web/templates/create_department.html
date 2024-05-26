@@ -5,7 +5,7 @@
         <h2>Создать отдел</h2>
         <form action="/create_department" method="post">
             <div class="form-group">
-                <input type="text" class="form-control" id="name_department" name="name_department" placeholder="Введите название">
+                <input type="text" class="form-control" id="name_department" name="name_department"  required>
             </div>
             <button type="submit" class="btn btn-primary btn-login btn-block">Создать</button>
             {{ if .error }}
